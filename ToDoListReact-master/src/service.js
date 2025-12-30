@@ -1,12 +1,7 @@
 import axios from 'axios';
 
-// הגדרת כתובת ה-API של השרת שלך
-// ודאי שהפורט (5164) תואם למה שרץ אצלך ב-C#
-
 const apiUrl = "http://localhost:5164";
-axios.defaults.baseURL = apiUrl;
-
-// 1. Request Interceptor: הוספת ה-JWT Token מה-localStorage לכל בקשה שיוצאת לשרת
+axios.defaults.baseURL = process.env.REACT_APP_API_URL;
 axios.interceptors.request.use(config => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -17,22 +12,19 @@ axios.interceptors.request.use(config => {
     return Promise.reject(error);
 });
 
-// 2. Response Interceptor: טיפול בשגיאות שחוזרות מהשרת
 axios.interceptors.response.use(
     response => response,
     error => {
-        // אם השרת מחזיר 401, זה אומר שהטוקן לא תקף או חסר
         if (error.response && error.response.status === 401) {
             console.warn("Unauthorized! Redirecting to login...");
-            localStorage.removeItem('token'); // מחיקת הטוקן הפגום
-            window.location.href = '/login'; // הפניה לדף התחברות
+            localStorage.removeItem('token'); 
+            window.location.href = '/login'; 
         }
         return Promise.reject(error);
     }
 );
 
 export default {
-    // פונקציות ניהול המשימות הקיימות (מעודכנות לעבודה עם axios)
     getTasks: async () => {
         const result = await axios.get('/items');    
         return result.data;
@@ -53,11 +45,9 @@ export default {
         return result.data;
     },
 
-    // 3. פונקציות ה-Authentication החדשות עבור האתגר
     login: async (username, password) => {
         try {
             const result = await axios.post('/login', { Username: username, Password: password });
-            // שמירת הטוקן בזיכרון המקומי של הדפדפן
             if (result.data && result.data.token) {
                 localStorage.setItem('token', result.data.token);
             }

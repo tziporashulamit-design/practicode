@@ -8,14 +8,12 @@ using TodoApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. הגדרת שירותים (Services) ---
 
 builder.Services.AddCors(options => options.AddPolicy("AllowAll", 
     p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 builder.Services.AddDbContext<ToDoDbContext>();
 
-// מפתח סודי - ודאי שהוא תואם למה שמוגדר אצלך
 var jwtKey = "YourSecretSuperLongKeyHere12345678"; 
 var key = Encoding.ASCII.GetBytes(jwtKey);
 
