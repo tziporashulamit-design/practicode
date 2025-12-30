@@ -1,0 +1,118 @@
+// ===== Program.cs =====
+using System;
+using System.Collections.Generic;
+using System.CommandLine;
+using System.IO;
+using System.Linq;
+// ===== Command & Options =====
+var bundleOption = new Option<FileInfo>(
+    "--output",
+    "Path to output file"
+)
+{ IsRequired = true };
+var languageOption = new Option<string[]>(
+    "--language",
+    "Programming languages to include"
+)
+{ IsRequired = true };
+languageOption.AddAlias("-l");
+var sortOption = new Option<string>(
+    "--sort",
+    () => "name",
+    "Sort files by name or type"
+);
+sortOption.AddAlias("-s");
+sortOption.FromAmong("name", "type");
+var removeEmptyLinesOption = new Option<bool>(
+    "--remove-empty-lines",
+    "Path to output file"
+);
+removeEmptyLinesOption.AddAlias("-r");
+var bundleCommand = new Command("bundle", "Bundles files");
+bundleCommand.AddOption(bundleOption);
+bundleCommand.AddOption(languageOption);
+bundleCommand.AddOption(sortOption);
+bundleCommand.AddOption(removeEmptyLinesOption);
+// ===== Language → Extensions map =====
+var languageExtensions = new Dictionary<string, string[]>
+{
+    ["cs"] = new[] { ".cs" },
+    ["js"] = new[] { ".js" },
+    ["ts"] = new[] { ".ts" },
+    ["py"] = new[] { ".py" },
+    ["java"] = new[] { ".java" }
+};
+// ===== Helper =====
+static string[] GetExtensions(
+    string[] languages,
+    Dictionary<string, string[]> languageExtensions)
+{
+    if (languages.Contains("all"))
+        return new[] { "*" };
+    return languages
+        .Where(l => languageExtensions.ContainsKey(l))
+        .SelectMany(l => languageExtensions[l])
+        .ToArray();
+}
+// ===== Handler =====
+bundleCommand.SetHandler(
+    (FileInfo output, string[] language, string sort,bool removeEmptyLines) =>
+    {
+        Console.WriteLine($"removeEmptyLines = {removeEmptyLines}");
+        var baseDir = Directory.GetCurrentDirectory();
+        var excludedFolders = new[] { "bin", "obj", "debug" };
+        var extensions = GetExtensions(language, languageExtensions);
+        // 1️⃣ scan
+        var files = Directory
+            .EnumerateFiles(baseDir, "*.*", SearchOption.AllDirectories)
+            .Where(f =>
+                !excludedFolders.Any(ex =>
+                    f.Contains(
+                        Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase)
+                )
+            );
+        // 2️⃣ filter by language
+        if (!extensions.Contains("*"))
+        {
+            files = files.Where(f =>
+                extensions.Contains(
+                    Path.GetExtension(f),
+                    StringComparer.OrdinalIgnoreCase
+                )
+            );
+        }
+        // 3️⃣ sort
+        files = sort == "type"
+            ? files.OrderBy(f => Path.GetExtension(f))
+            : files.OrderBy(f => Path.GetFileName(f));
+        // 4️⃣ write bundle
+        using var writer = new StreamWriter(output.FullName, false);
+        foreach (var file in files)
+        {
+            writer.WriteLine($"// ===== {Path.GetFileName(file)} =====");
+            var lines = File.ReadAllLines(file);
+            if (removeEmptyLines)
+            {
+                lines = lines
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .ToArray();
+            }
+            foreach (var line in lines)
+            {
+                writer.WriteLine(line);
+            }
+            writer.WriteLine();
+        }
+        Console.WriteLine("Bundle created successfully:");
+        Console.WriteLine(output.FullName);
+    },
+    bundleOption,
+    languageOption,
+    sortOption,
+removeEmptyLinesOption);
+// ===== Root =====
+var rootCommand = new RootCommand("Root command for file bundler CLI");
+rootCommand.AddCommand(bundleCommand);
+await rootCommand.InvokeAsync(args);
+
